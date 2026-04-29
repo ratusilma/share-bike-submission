@@ -58,235 +58,89 @@ if "season_label" in hour_filtered.columns:
     hour_filtered = hour_filtered[hour_filtered["season_label"].isin(selected_seasons)]
 
 st.title("Dashboard Penyewaan Sepeda :sparkles:")
-st.subheader("Ringkasan Harian")
-
-col1, col2 = st.columns(2)
-with col1:
-    working_day_rent = data_filtered[data_filtered["workingday"] == 1]
-    total_rent = working_day_rent["cnt"].sum()
-    st.metric("Total penyewaan (hari kerja)", value=total_rent)
-    
-with col2:
-    holiday_rent = data_filtered[data_filtered["holiday"] == 1]
-    total_rent_holiday = holiday_rent["cnt"].sum()
-    st.metric("Total penyewaan (hari libur)", value=total_rent_holiday)
-
-data_ten_day = data_filtered.sort_values("dteday").head(10)
-fig, ax = plt.subplots(figsize=(16,8))
-ax.plot(
-    data_ten_day["dteday"],
-    data_ten_day["cnt"],
-    marker='o',
-    linewidth = 2,
-    color="#90CAF9"
-)
-ax.tick_params(axis='y', labelsize=20)
-ax.tick_params(axis='x', labelsize=15)
- 
-st.pyplot(fig)
-
-st.subheader("Casual vs Registered (Hari Kerja)")
-col1, col2 = st.columns(2)
-with col1:
-    working_day_casual = data_filtered[data_filtered["workingday"] == 1]
-    total_rent = working_day_casual["casual"].sum()
-    st.metric("Total casual (hari kerja)", value=total_rent)
-    
-with col2:
-    working_day_registered = data_filtered[data_filtered["workingday"] == 1]
-    total_rent_registered = working_day_registered["registered"].sum()
-    st.metric("Total registered (hari kerja)", value=total_rent_registered)
-
-workingday_data = data_filtered[data_filtered["workingday"] == 1]
-
-# Hitung total penyewaan casual dan registered pada hari kerja
-total_casual = workingday_data['casual'].sum()
-total_registered = workingday_data['registered'].sum()
-
-# Data untuk visualisasi
-categories = ["Casual", "Registered"]
-values = [total_casual, total_registered]
-
-# Membuat plot bar
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.bar(categories, values, color=["#D3D3D3", '#FFB74D'])
-
-# Menambahkan label dan judul
-ax.set_title("Total Penyewaan di Hari Kerja", fontsize=18)
-ax.set_ylabel(None)
-
-# Menampilkan plot pada Streamlit
-st.pyplot(fig)
-
-st.subheader("Casual vs Registered (Hari Libur)")
-col1, col2 = st.columns(2)
-with col1:
-    working_day_casual = data_filtered[data_filtered["holiday"] == 1]
-    total_rent = working_day_casual["casual"].sum()
-    st.metric("Total casual (hari libur)", value=total_rent)
-    
-with col2:
-    working_day_registered = data_filtered[data_filtered["holiday"] == 1]
-    total_rent_registered = working_day_registered["registered"].sum()
-    st.metric("Total registered (hari libur)", value=total_rent_registered)
-
-holiday_data = data_filtered[data_filtered["holiday"] == 1]
-
-# Hitung total penyewaan casual dan registered pada hari kerja
-total_casual = holiday_data['casual'].sum()
-total_registered = holiday_data['registered'].sum()
-
-# Data untuk visualisasi
-categories = ["Casual", "Registered"]
-values = [total_casual, total_registered]
-
-# Membuat plot bar
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.bar(categories, values, color=["#D3D3D3", '#FFB74D'])
-
-# Menambahkan label dan judul
-ax.set_title("Total Penyewaan di Hari Libur", fontsize=18)
-ax.set_ylabel(None)
-
-# Menampilkan plot pada Streamlit
-st.pyplot(fig)
-
-st.subheader("Pengaruh Kondisi Cuaca terhadap Penyewaan")
-fig, ax = plt.subplots(figsize=(10, 6))
-sns.heatmap(data_filtered[["temp", "atemp", "hum", "windspeed", "cnt"]].corr(), annot=True, ax=ax)
-st.pyplot(fig)
-
-st.subheader("Perbandingan Hari Kerja vs Hari Libur")
-compare_df = (
-    data_filtered.groupby("workingday")[["casual", "registered"]]
-    .sum()
-    .rename(index={0: "Bukan Hari Kerja", 1: "Hari Kerja"})
-)
-compare_df.index.name = "Jenis Hari"
-compare_melted = compare_df.reset_index().melt(
-    id_vars="Jenis Hari", var_name="Tipe Pengguna", value_name="Total Penyewaan"
+st.markdown(
+    "Dashboard ini merangkum hasil analisis untuk menjawab dua pertanyaan bisnis: "
+    "(1) perbedaan permintaan antar musim pada 2012 dan (2) perbedaan pola per jam "
+    "antara hari kerja dan akhir pekan pada Q3 2011."
 )
 
-fig, ax = plt.subplots(figsize=(10, 5))
+st.subheader("Pertanyaan 1: Perbandingan musim 2012")
+day_2012 = data_filtered[data_filtered["yr"] == 1].copy()
+season_avg = (
+    day_2012.groupby("season_label", as_index=False)["cnt"]
+    .mean()
+    .rename(columns={"cnt": "avg_cnt"})
+)
+
+summer_avg = season_avg.loc[season_avg["season_label"] == "Musim Panas", "avg_cnt"].mean()
+winter_avg = season_avg.loc[season_avg["season_label"] == "Musim Dingin", "avg_cnt"].mean()
+season_gap = summer_avg - winter_avg
+lowest_season = season_avg.sort_values("avg_cnt").head(1)
+
+col1, col2, col3 = st.columns(3)
+col1.metric("Rata-rata Musim Panas", f"{summer_avg:,.0f}")
+col2.metric("Rata-rata Musim Dingin", f"{winter_avg:,.0f}")
+col3.metric("Selisih Panas vs Dingin", f"{season_gap:,.0f}")
+
+fig, ax = plt.subplots(figsize=(8, 4.5))
 sns.barplot(
-    data=compare_melted,
-    x="Jenis Hari",
-    y="Total Penyewaan",
-    hue="Tipe Pengguna",
-    palette=["#D3D3D3", "#72BCD4"],
+    data=season_avg,
+    x="season_label",
+    y="avg_cnt",
+    order=["Musim Semi", "Musim Panas", "Musim Gugur", "Musim Dingin"],
+    color="#4C78A8",
     ax=ax,
 )
-ax.set_title("Total Penyewaan berdasarkan Jenis Hari")
-ax.set_xlabel(None)
-ax.set_ylabel(None)
+ax.set_title("Rata-rata Peminjaman Harian per Musim (2012)")
+ax.set_xlabel("Musim")
+ax.set_ylabel("Rata-rata Peminjaman (cnt)")
 st.pyplot(fig)
 
-st.subheader("Faktor Cuaca (Per Jam) vs Penyewaan")
-fig, axes = plt.subplots(2, 2, figsize=(12, 8))
-sns.scatterplot(x="temp", y="cnt", data=hour_filtered, ax=axes[0, 0])
-axes[0, 0].set_title("Suhu vs Penyewaan")
-axes[0, 0].set_xlabel("Suhu (Normalisasi)")
-axes[0, 0].set_ylabel("Penyewaan")
+st.markdown(
+    "**Penjelasan:** Musim dengan rata-rata terendah adalah "
+    f"**{lowest_season.iloc[0]['season_label']}** (~{lowest_season.iloc[0]['avg_cnt']:.0f}). "
+    "Musim ini menjadi kandidat prioritas program peningkatan usage."
+)
 
-sns.scatterplot(x="hum", y="cnt", data=hour_filtered, ax=axes[0, 1])
-axes[0, 1].set_title("Kelembapan vs Penyewaan")
-axes[0, 1].set_xlabel("Kelembapan (Normalisasi)")
-axes[0, 1].set_ylabel("Penyewaan")
+st.subheader("Pertanyaan 2: Pola per jam Q3 2011")
+hour_q3 = hour_filtered[(hour_filtered["yr"] == 0) & (hour_filtered["mnth"].between(7, 9))].copy()
+hour_q3["day_type"] = hour_q3["workingday"].map({1: "Hari Kerja", 0: "Akhir Pekan/Libur"})
 
-sns.scatterplot(x="windspeed", y="cnt", data=hour_filtered, ax=axes[1, 0])
-axes[1, 0].set_title("Kecepatan Angin vs Penyewaan")
-axes[1, 0].set_xlabel("Kecepatan Angin (Normalisasi)")
-axes[1, 0].set_ylabel("Penyewaan")
+total_by_day = hour_q3.groupby("day_type", as_index=False)["cnt"].sum()
+working_total = total_by_day.loc[total_by_day["day_type"] == "Hari Kerja", "cnt"].sum()
+weekend_total = total_by_day.loc[total_by_day["day_type"] == "Akhir Pekan/Libur", "cnt"].sum()
+percent_diff = ((working_total - weekend_total) / weekend_total) * 100 if weekend_total else 0
 
-sns.boxplot(x="weathersit", y="cnt", data=hour_filtered, ax=axes[1, 1])
-axes[1, 1].set_title("Kondisi Cuaca vs Penyewaan")
-axes[1, 1].set_xlabel("Kondisi Cuaca")
-axes[1, 1].set_ylabel("Penyewaan")
+hourly_pattern = (
+    hour_q3.groupby(["day_type", "hr"], as_index=False)["cnt"]
+    .mean()
+    .rename(columns={"cnt": "avg_cnt"})
+)
+peak_hours = (
+    hourly_pattern.sort_values(["day_type", "avg_cnt"], ascending=[True, False])
+    .groupby("day_type", as_index=False)
+    .head(3)
+)
 
+col1, col2, col3 = st.columns(3)
+col1.metric("Total Hari Kerja", f"{working_total:,.0f}")
+col2.metric("Total Akhir Pekan/Libur", f"{weekend_total:,.0f}")
+col3.metric("Selisih (%)", f"{percent_diff:.1f}%")
+
+fig, ax = plt.subplots(figsize=(9, 4.5))
+sns.lineplot(data=hourly_pattern, x="hr", y="avg_cnt", hue="day_type", marker="o", ax=ax)
+ax.set_title("Rata-rata Peminjaman per Jam di Q3 2011")
+ax.set_xlabel("Jam")
+ax.set_ylabel("Rata-rata Peminjaman (cnt)")
+ax.set_xticks(range(0, 24, 2))
+ax.legend(title="Tipe Hari")
 st.pyplot(fig)
 
-st.subheader("RFM Musiman (Casual vs Registered)")
-rfm_base = data_filtered[["dteday", "season", "casual", "registered", "cnt"]].copy()
-rfm_long = rfm_base.melt(
-    id_vars=["dteday", "season"],
-    value_vars=["casual", "registered"],
-    var_name="user_type",
-    value_name="rentals",
-)
-rfm_long = rfm_long[rfm_long["rentals"] > 0].copy()
-analysis_date = rfm_long["dteday"].max()
+st.markdown("**Jam puncak (top 3) per tipe hari:**")
+st.dataframe(peak_hours, use_container_width=True)
 
-rfm = (
-    rfm_long.groupby(["season", "user_type"]).agg(
-        recency_days=("dteday", lambda x: (analysis_date - x.max()).days),
-        frequency=("dteday", "nunique"),
-        monetary=("rentals", "sum"),
-    )
-    .reset_index()
-)
-
-rfm["season_label"] = rfm["season"].map(season_map).fillna(rfm["season"].astype(str))
-
-rfm["R"] = (
-    rfm.groupby("user_type")["recency_days"]
-    .transform(lambda s: pd.qcut(s.rank(method="first"), q=4, labels=[4, 3, 2, 1]))
-    .astype(int)
-)
-rfm["F"] = (
-    rfm.groupby("user_type")["frequency"]
-    .transform(lambda s: pd.qcut(s.rank(method="first"), q=4, labels=[1, 2, 3, 4]))
-    .astype(int)
-)
-rfm["M"] = (
-    rfm.groupby("user_type")["monetary"]
-    .transform(lambda s: pd.qcut(s.rank(method="first"), q=4, labels=[1, 2, 3, 4]))
-    .astype(int)
-)
-rfm["rfm_score"] = rfm[["R", "F", "M"]].sum(axis=1)
-
-def label_segment(score):
-    if score >= 10:
-        return "Nilai Tinggi"
-    if score >= 7:
-        return "Loyal"
-    if score >= 4:
-        return "Berisiko"
-    return "Nilai Rendah"
-
-rfm["segment"] = rfm["rfm_score"].apply(label_segment)
-
-rfm_summary = rfm[[
-    "season_label",
-    "user_type",
-    "recency_days",
-    "frequency",
-    "monetary",
-    "R",
-    "F",
-    "M",
-    "rfm_score",
-    "segment",
-]].sort_values(["user_type", "rfm_score"], ascending=[True, False])
-
-st.dataframe(rfm_summary, use_container_width=True)
-
-pivot_score = rfm_summary.pivot(index="season_label", columns="user_type", values="rfm_score")
-fig, ax = plt.subplots(figsize=(7, 4))
-sns.heatmap(pivot_score, annot=True, cmap="Blues", fmt=".0f", ax=ax)
-ax.set_title("Skor RFM per Musim dan Tipe Pengguna")
-ax.set_xlabel("Tipe Pengguna")
-ax.set_ylabel("Musim")
-st.pyplot(fig)
-
-top_segment = rfm_summary.sort_values("rfm_score", ascending=False).head(1)
-bottom_segment = rfm_summary.sort_values("rfm_score", ascending=True).head(1)
-st.caption(
-    "Segmen musim tertinggi: "
-    f"{top_segment.iloc[0]['season_label']} - {top_segment.iloc[0]['user_type']} "
-    f"({top_segment.iloc[0]['segment']})."
-)
-st.caption(
-    "Segmen musim terendah: "
-    f"{bottom_segment.iloc[0]['season_label']} - {bottom_segment.iloc[0]['user_type']} "
-    f"({bottom_segment.iloc[0]['segment']})."
+st.markdown(
+    "**Penjelasan:** Jam puncak hari kerja biasanya pada rentang "
+    "pagi dan sore, sedangkan akhir pekan cenderung naik pada siang hari. "
+    "Informasi ini membantu alokasi armada pada jam-jam kritis."
 )
